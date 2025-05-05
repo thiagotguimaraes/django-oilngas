@@ -1,21 +1,64 @@
 from rest_framework import serializers
 from .models import Well
-from .models import WellBoundaries
-
+import re
+from .models import Dataset
+from .models import DatasetType, DatasetColumn
 
 class WellSerializer(serializers.ModelSerializer):
     class Meta:
         model = Well
         fields = '__all__'
 
-class WellBoundariesSerializer(serializers.ModelSerializer):
+
+class DatasetColumnSerializer(serializers.ModelSerializer):
+    dataset_type_id = serializers.PrimaryKeyRelatedField(
+        source='dataset_type', queryset=DatasetType.objects.all()
+    )
+
     class Meta:
-        model = WellBoundaries
-        fields = '__all__'
+        model = DatasetColumn
+        fields = ['id', 'dataset_type_id', 'name', 'mnemonic', 'uom', 'data_type']
+
+    def validate_mnemonic(self, value):
+        if not re.match(r'^[a-z_][a-z0-9_]*$', value):
+            raise serializers.ValidationError(
+                "Mnemonic must be lowercase, start with a letter or underscore, and contain only lowercase letters, numbers, or underscores."
+            )
+        return value
+
+class DatasetTypeSerializer(serializers.ModelSerializer):
+    columns = DatasetColumnSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = DatasetType
+        fields = ['id', 'name', 'columns']
+
+    def validate_name(self, value):
+        if not re.match(r'^[a-z_][a-z0-9_]*$', value):
+            raise serializers.ValidationError(
+                "Name must be lowercase, start with a letter or underscore, and contain only lowercase letters, numbers, or underscores."
+            )
+        return value
+
+class DatasetSerializer(serializers.ModelSerializer):
+    dataset_type = DatasetTypeSerializer(read_only=True)
+
+    dataset_type_id = serializers.PrimaryKeyRelatedField(
+        source='dataset_type', queryset=DatasetType.objects.all()
+    )
+    well_id = serializers.PrimaryKeyRelatedField(
+        source='well', queryset=Well.objects.all()
+    )
+    
+    class Meta:
+        model = Dataset
+        fields = ['id', 'dataset_type_id', 'well_id', 'table_name', 'dataset_type', 'created_at']
+        read_only_fields = ['dataset_type_id', 'well_id', 'table_name', 'dataset_type', 'created_at']
+
 
 class WellFullSerializer(serializers.ModelSerializer):
-    boundaries = WellBoundariesSerializer(read_only=True)
+    datasets = DatasetSerializer(many=True, read_only=True)
 
     class Meta:
         model = Well
-        fields = ['id', 'name', 'location', 'created_at', 'boundaries']
+        fields = ['id', 'name', 'location', 'created_at', 'datasets']

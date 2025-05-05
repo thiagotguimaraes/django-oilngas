@@ -1,5 +1,7 @@
 from django_filters import rest_framework as filters
 from .models import Well
+from django.db.models.query import QuerySet
+from django.http import QueryDict
 
 class WellFullFilter(filters.FilterSet):
     start_ms = filters.NumberFilter(method='filter_by_time_range')
@@ -8,7 +10,9 @@ class WellFullFilter(filters.FilterSet):
     location = filters.CharFilter(field_name='location', lookup_expr='icontains')
 
 
-    def filter_by_time_range(self, queryset, name, value):
+    def filter_by_time_range(self, queryset: QuerySet[Well], name: str, value: int) -> QuerySet[Well]:
+        self.data: QueryDict
+        
         start = self.data.get('start_ms')
         end = self.data.get('end_ms')
 
