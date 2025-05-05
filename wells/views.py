@@ -1,4 +1,5 @@
 from rest_framework import viewsets, mixins
+from rest_framework.views import APIView
 from .models import Well
 from .serializers import WellFullSerializer, WellSerializer
 from django_filters.rest_framework import DjangoFilterBackend
@@ -12,7 +13,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.exceptions import MethodNotAllowed
-from rest_framework.serializers import Serializer
+from django.db import connection
 
 class WellViewSet(viewsets.ModelViewSet):
     queryset = Well.objects.all()
@@ -37,8 +38,8 @@ class DatasetViewSet(viewsets.ModelViewSet):
     queryset = Dataset.objects.select_related("dataset_type", "well").all()
     serializer_class = DatasetSerializer
 
-    def perform_create(self, serializer: Serializer):
-        dataset_type = serializer.validated_data['dataset_type']
+    def perform_create(self, serializer):
+        dataset_type: DatasetTypeSerializer = serializer.validated_data['dataset_type']
         well = serializer.validated_data['well']
 
         # Enforce uniqueness before touching the DB
@@ -77,3 +78,124 @@ class DatasetViewSet(viewsets.ModelViewSet):
 
     def partial_update(self, request, *args, **kwargs):
         raise MethodNotAllowed("PATCH", detail="Partial updating datasets is not allowed.")
+    
+
+class DatasetTableView(APIView):
+    """
+    API View to perform CRUD operations on the SQL table specified in Dataset.table_name.
+    """
+
+    def get(self, request, dataset_id):
+        """
+        Retrieve rows from the dataset's table with optional filtering by start_ms and end_ms.
+        """
+        start_ms = request.query_params.get('start_ms')
+        end_ms = request.query_params.get('end_ms')
+
+        # Get the dataset and its table name
+        try:
+            dataset = Dataset.objects.get(id=dataset_id)
+        except Dataset.DoesNotExist:
+            return Response({"detail": "Dataset not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        table_name = dataset.table_name
+
+        # Build the SQL query with optional filters
+        query = f'SELECT * FROM "{table_name}"'
+        conditions = []
+        if start_ms:
+            conditions.append(f"timestamp >= {start_ms}")
+        if end_ms:
+            conditions.append(f"timestamp <= {end_ms}")
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+
+        # Execute the query
+        with connection.cursor() as cursor:
+            cursor.execute(query)
+            columns = [col[0] for col in cursor.description]
+            rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+        return Response(rows, status=status.HTTP_200_OK)
+
+    def post(self, request, dataset_id):
+        """
+        Insert multiple rows into the dataset's table.
+        """
+        # Get the dataset and its table name
+        try:
+            dataset = Dataset.objects.get(id=dataset_id)
+        except Dataset.DoesNotExist:
+            return Response({"detail": "Dataset not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        table_name = dataset.table_name
+        data_points = request.data
+
+        if not isinstance(data_points, list):
+            return Response(
+                {"detail": "Expected a list of data points."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validate if columns exist in dataset columns
+        dataset_columns = DatasetColumn.objects.filter(dataset_type=dataset.dataset_type)
+        valid_columns = {col.mnemonic for col in dataset_columns}
+        valid_columns.add('timestamp')
+
+        # Build the SQL query for insertion
+        rows = []
+        for data in data_points:
+            invalid_columns = [col for col in data.keys() if col not in valid_columns]
+            if invalid_columns:
+                return Response(
+                    {"detail": f"Invalid columns: {', '.join(invalid_columns)}"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            columns = ', '.join(data.keys())
+            values = ', '.join([f"'{value}'" for value in data.values()])
+            rows.append(f"({values})")
+
+        if not rows:
+            return Response(
+                {"detail": "No valid data points provided."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        query = f'INSERT INTO "{table_name}" ({columns}) VALUES {", ".join(rows)}'
+
+        # Execute the query
+        with connection.cursor() as cursor:
+            cursor.execute(query)
+
+        return Response({"detail": "Rows inserted successfully."}, status=status.HTTP_201_CREATED)
+
+    def delete(self, request, dataset_id):
+        """
+        Delete rows from the dataset's table with optional filtering by start_ms and end_ms.
+        """
+        start_ms = request.query_params.get('start_ms')
+        end_ms = request.query_params.get('end_ms')
+
+        # Get the dataset and its table name
+        try:
+            dataset = Dataset.objects.get(id=dataset_id)
+        except Dataset.DoesNotExist:
+            return Response({"detail": "Dataset not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        table_name = dataset.table_name
+
+        # Build the SQL query for deletion
+        query = f'DELETE FROM "{table_name}"'
+        conditions = []
+        if start_ms:
+            conditions.append(f"start_ms >= {start_ms}")
+        if end_ms:
+            conditions.append(f"end_ms <= {end_ms}")
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+
+        # Execute the query
+        with connection.cursor() as cursor:
+            cursor.execute(query)
+
+        return Response({"detail": "Rows deleted successfully."}, status=status.HTTP_200_OK)

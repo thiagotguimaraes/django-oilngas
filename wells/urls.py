@@ -4,6 +4,7 @@ from .views import WellViewSet
 from .views import WellFullViewSet
 from .views import DatasetTypeViewSet, DatasetColumnViewSet
 from .views import DatasetViewSet
+from .views import DatasetTableView
 
 
 router = DefaultRouter()
@@ -16,5 +17,7 @@ router.register(r'datasets', DatasetViewSet) # type: ignore
 
 urlpatterns = [
     path('', include(router.urls)), # type: ignore
+    path('datasets/<int:dataset_id>/data/', DatasetTableView.as_view(), name='dataset-data'),
+
 ]
 

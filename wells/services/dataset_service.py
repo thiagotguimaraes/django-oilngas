@@ -2,6 +2,8 @@ from django.db import connection
 from wells.models import DatasetType, Dataset
 import uuid
 
+from wells.serializers import DatasetTypeSerializer
+
 def sql_type(dtype: str) -> str:
     return {
         "float": "DOUBLE PRECISION",
@@ -9,7 +11,7 @@ def sql_type(dtype: str) -> str:
         "text": "TEXT"
     }.get(dtype, "TEXT")
 
-def create_dataset_table(dataset_type: DatasetType, well_id: uuid.UUID) -> str:
+def create_dataset_table(dataset_type: DatasetTypeSerializer, well_id: uuid.UUID) -> str:
     table_name = f"{dataset_type.name}_{str(well_id).replace('-', '')}"
 
     columns_sql = ",\n".join([
