@@ -17,7 +17,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'django_filters',
-    'wells',         
+    'main.wells',         
 ]
 
 REST_FRAMEWORK = {

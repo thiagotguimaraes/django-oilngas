@@ -75,7 +75,7 @@ class Migration(migrations.Migration):
                     models.ForeignKey(
                         on_delete=django.db.models.deletion.CASCADE,
                         related_name="columns",
-                        to="wells.datasettype",
+                        to="main.wells.datasettype",
                     ),
                 ),
             ],
@@ -99,7 +99,7 @@ class Migration(migrations.Migration):
                     models.ForeignKey(
                         on_delete=django.db.models.deletion.CASCADE,
                         related_name="datasets",
-                        to="wells.datasettype",
+                        to="main.wells.datasettype",
                     ),
                 ),
                 (
@@ -107,7 +107,7 @@ class Migration(migrations.Migration):
                     models.ForeignKey(
                         on_delete=django.db.models.deletion.CASCADE,
                         related_name="datasets",
-                        to="wells.well",
+                        to="main.wells.well",
                     ),
                 ),
             ],

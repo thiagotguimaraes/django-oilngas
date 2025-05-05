@@ -1,8 +1,8 @@
 from django.db import connection
-from wells.models import DatasetType, Dataset
+from main.wells.models import DatasetType, Dataset
 import uuid
 
-from wells.serializers import DatasetTypeSerializer
+from main.wells.serializers import DatasetTypeSerializer
 
 def sql_type(dtype: str) -> str:
     return {
