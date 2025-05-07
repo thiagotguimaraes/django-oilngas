@@ -1,8 +1,8 @@
 from django.db import connection
-from main.wells.models import DatasetType, Dataset
+from main.datasets.models import DatasetType, Dataset
 import uuid
 
-from main.wells.serializers import DatasetTypeSerializer
+from main.datasets.serializers import DatasetTypeSerializer
 
 def sql_type(dtype: str) -> str:
     return {
@@ -13,6 +13,9 @@ def sql_type(dtype: str) -> str:
 
 def create_dataset_table(dataset_type: DatasetTypeSerializer, well_id: uuid.UUID) -> str:
     table_name = f"{dataset_type.name}_{str(well_id).replace('-', '')}"
+
+    if not dataset_type.columns.exists():
+        raise ValueError("DatasetType must have at least one column defined.")
 
     columns_sql = ",\n".join([
         f"{col.mnemonic} {sql_type(col.data_type)}"

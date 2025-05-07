@@ -1,5 +1,5 @@
 from django_filters import rest_framework as filters
-from .models import Well
+from main.wells.models import Well
 from django.db.models.query import QuerySet
 from django.http import QueryDict
 
